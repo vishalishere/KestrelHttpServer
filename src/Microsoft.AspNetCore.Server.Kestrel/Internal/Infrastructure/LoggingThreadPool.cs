@@ -12,105 +12,62 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Internal.Infrastructure
     {
         private readonly IKestrelTrace _log;
 
-        private WaitCallback _runAction;
-        private WaitCallback _cancelTcs;
-        private WaitCallback _completeTcs;
-
         public LoggingThreadPool(IKestrelTrace log)
         {
             _log = log;
-
-            // Curry and capture log in closures once
-            // The currying is done in functions of the same name to improve the 
-            // call stack for exceptions and profiling else it shows up as LoggingThreadPool.ctor>b__4_0
-            // and you aren't sure which of the 3 functions was called.
-            RunAction();
-            CompleteTcs();
-            CancelTcs();
-        }
-
-        private void RunAction()
-        {
-            // Capture _log in a singleton closure
-            _runAction = (o) =>
-            {
-                try
-                {
-                    ((Action)o)();
-                }
-                catch (Exception e)
-                {
-                    _log.LogError(0, e, "LoggingThreadPool.Run");
-                }
-            };
-        }
-
-        private void CompleteTcs()
-        {
-            // Capture _log in a singleton closure
-            _completeTcs = (o) =>
-            {
-                try
-                {
-                    ((TaskCompletionSource<object>)o).TrySetResult(null);
-                }
-                catch (Exception e)
-                {
-                    _log.LogError(0, e, "LoggingThreadPool.Complete");
-                }
-            };
-        }
-
-        private void CancelTcs()
-        {
-            // Capture _log in a singleton closure
-            _cancelTcs = (o) =>
-            {
-                try
-                {
-                    ((TaskCompletionSource<object>)o).TrySetCanceled();
-                }
-                catch (Exception e)
-                {
-                    _log.LogError(0, e, "LoggingThreadPool.Cancel");
-                }
-            };
         }
 
         public void Run(Action action)
         {
-            ThreadPool.QueueUserWorkItem(_runAction, action);
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                _log.LogError(0, e, "LoggingThreadPool.Run");
+            }
         }
 
         public void UnsafeRun(WaitCallback action, object state)
         {
-            ThreadPool.QueueUserWorkItem(action, state);
+            action(state);
         }
 
         public void Complete(TaskCompletionSource<object> tcs)
         {
-            ThreadPool.QueueUserWorkItem(_completeTcs, tcs);
+            try
+            {
+                tcs.TrySetResult(null);
+            }
+            catch (Exception e)
+            {
+                _log.LogError(0, e, "LoggingThreadPool.Run");
+            }
         }
 
         public void Cancel(TaskCompletionSource<object> tcs)
         {
-            ThreadPool.QueueUserWorkItem(_cancelTcs, tcs);
+            try
+            {
+                tcs.TrySetCanceled();
+            }
+            catch (Exception e)
+            {
+                _log.LogError(0, e, "LoggingThreadPool.Run");
+            }
         }
 
         public void Error(TaskCompletionSource<object> tcs, Exception ex)
         {
-            // ex and _log are closure captured 
-            ThreadPool.QueueUserWorkItem((o) =>
+            try
             {
-                try
-                {
-                    ((TaskCompletionSource<object>)o).TrySetException(ex);
-                }
-                catch (Exception e)
-                {
-                    _log.LogError(0, e, "LoggingThreadPool.Error");
-                }
-            }, tcs);
+                tcs.TrySetException(ex);
+            }
+            catch (Exception e)
+            {
+                _log.LogError(0, e, "LoggingThreadPool.Error");
+            }
         }
     }
 }

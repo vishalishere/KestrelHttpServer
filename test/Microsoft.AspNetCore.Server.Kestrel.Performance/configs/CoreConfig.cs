@@ -25,4 +25,21 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Performance
                 .WithTargetCount(10));
         }
     }
+    public class FastConfig : ManualConfig
+    {
+        public FastConfig()
+        {
+            Add(JitOptimizationsValidator.FailOnError);
+            Add(new RpsColumn());
+
+            Add(Job.Default
+                .With(BenchmarkDotNet.Environments.Runtime.Core)
+                .WithRemoveOutliers(false)
+                .With(new GcMode() { Server = true })
+                .With(RunStrategy.Throughput)
+                .WithLaunchCount(1)
+                .WithWarmupCount(5)
+                .WithTargetCount(20));
+        }
+    }
 }

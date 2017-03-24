@@ -76,7 +76,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Internal
 
         public KestrelTrace(ILogger logger)
         {
-            _logger = logger;
+            //_logger = logger;
+            _logger = new TestLogger();
         }
 
         public virtual void ConnectionStart(string connectionId)
@@ -200,6 +201,24 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Internal
         public virtual IDisposable BeginScope<TState>(TState state)
         {
             return _logger.BeginScope(state);
+        }
+
+        private class TestLogger : ILogger
+        {
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            {
+                Console.WriteLine(formatter(state, exception));
+            }
+
+            public bool IsEnabled(LogLevel logLevel)
+            {
+                return true;
+            }
+
+            public IDisposable BeginScope<TState>(TState state)
+            {
+                return null;
+            }
         }
     }
 }

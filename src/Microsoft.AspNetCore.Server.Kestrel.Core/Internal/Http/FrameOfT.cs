@@ -3,10 +3,12 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure;
+using Microsoft.AspNetCore.Server.Kestrel.Internal.System.IO.Pipelines;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +34,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
         {
             try
             {
+                bool shouldFlush = false;
+
                 while (!_requestProcessingStopping)
                 {
                     TimeoutControl.SetTimeout(_keepAliveTicks, TimeoutAction.CloseConnection);
@@ -40,7 +44,23 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
 
                     while (!_requestProcessingStopping)
                     {
-                        var result = await Input.ReadAsync();
+                        var awaitable = Input.ReadAsync();
+
+                        ReadResult result;
+                        if (awaitable.IsCompleted)
+                        {
+                            result = awaitable.GetResult();
+                        }
+                        else
+                        {
+                            if (shouldFlush)
+                            {
+                                await Output.FlushAsync();
+                                shouldFlush = false;
+                            }
+                            result = await awaitable;
+                        }
+
                         var examined = result.Buffer.End;
                         var consumed = result.Buffer.End;
 
@@ -64,6 +84,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http
 
                         if (_requestProcessingStatus == RequestProcessingStatus.AppStarted)
                         {
+                            shouldFlush = true;
                             break;
                         }
 

@@ -155,6 +155,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Https
 
                 requestFeatures.Get<IHttpRequestFeature>().Scheme = "https";
             }
+
+            public void Dispose()
+            {
+                _sslStream.Dispose();
+            }
         }
 
         private class ClosedAdaptedConnection : IAdaptedConnection
@@ -162,6 +167,10 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Https
             public Stream ConnectionStream { get; } = new ClosedStream();
 
             public void PrepareRequest(IFeatureCollection requestFeatures)
+            {
+            }
+
+            public void Dispose()
             {
             }
         }

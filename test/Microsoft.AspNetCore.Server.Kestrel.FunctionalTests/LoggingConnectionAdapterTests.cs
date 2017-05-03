@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -17,7 +18,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.FunctionalTests
         [Fact]
         public async Task LoggingConnectionAdapterCanBeAddedBeforeAndAfterHttpsAdapter()
         {
+            var logger = new TestApplicationErrorLogger();
             var host = new WebHostBuilder()
+                .UseLoggerFactory(new KestrelTestLoggerFactory(logger))
                 .UseKestrel(options =>
                 {
                     options.Listen(new IPEndPoint(IPAddress.Loopback, 0), listenOptions =>
@@ -41,10 +44,17 @@ namespace Microsoft.AspNetCore.Server.Kestrel.FunctionalTests
             {
                 await host.StartAsync();
 
-                var response = await HttpClientSlim.GetStringAsync($"https://localhost:{host.GetPort()}/", validateCertificate: false)
-                                                   .TimeoutAfter(TimeSpan.FromSeconds(10));
+                try
+                {
+                    var response = await HttpClientSlim.GetStringAsync($"https://localhost:{host.GetPort()}/", validateCertificate: false)
+                                                       .TimeoutAfter(TimeSpan.FromSeconds(10));
 
-                Assert.Equal("Hello World!", response);
+                    Assert.Equal("Hello World!", response);
+                }
+                catch (TimeoutException)
+                {
+                    Assert.False(true, string.Join(Environment.NewLine, logger.Messages.Select(m => m.Message)));
+                }
             }
         }
     }
